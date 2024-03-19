@@ -1,0 +1,4 @@
+platformdirs
+openai
+pydantic
+diskcache
