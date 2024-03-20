@@ -65,13 +65,22 @@ class GPTClient:
             p_bar.update(1)
         return response
 
-    def __get_run_status(self, tasks):
+    def __get_run_status(self, tasks, results: List[ChatCompletion]):
         error_count = sum([1 for task in tasks if not task.finished])
         cache_hit = sum([1 for task in tasks if task.from_cache])
         run_times = [task.run_time for task in tasks if task.run_time is not None]
         mean_run_time = get_mean(run_times)
         self.logger.info(
             f"{len(tasks)-error_count} succeed, {error_count} fail, {cache_hit} hit cache | mean run time {mean_run_time:.3f}s."
+        )
+        completion_tokens, prompt_tokens, total_tokens = 0, 0, 0
+        for r in results:
+            if isinstance(r, ChatCompletion):
+                completion_tokens += r.usage.completion_tokens
+                prompt_tokens += r.usage.prompt_tokens
+                total_tokens += r.usage.total_tokens
+        self.logger.info(
+            f"prompt tokens: {prompt_tokens}, completion tokens: {completion_tokens}, total tokens: {total_tokens}"
         )
 
     def run_chat_completion_tasks(
@@ -94,5 +103,5 @@ class GPTClient:
         results = asyncio.run(run_with_semaphore())
 
         self.logger.info(f"all tasks finished in {perf_counter()-start:.3f}s")
-        self.__get_run_status(tasks)
+        self.__get_run_status(tasks, results)
         return results
