@@ -8,7 +8,8 @@ from diskcache import Cache
 from platformdirs import user_cache_dir
 import logging
 import coloredlogs
-from gpt_client.task import Task
+from gpt_client.types import Task
+from gpt_client.utils import get_mean
 
 
 class GPTClient:
@@ -29,21 +30,21 @@ class GPTClient:
         else:
             self.cache = None
 
-        self.logger = logging.getLogger("real_search")
+        self.logger = logging.getLogger("GPTClient")
         self.logger.setLevel(log_level)
         coloredlogs.install(level=log_level, logger=self.logger)
 
-        self.cache_hit = 0
 
-    async def __run_single_task(
+    async def __run_single_chat_completion_task(
         self, task: Task, sem: asyncio.Semaphore
     ) -> ChatCompletion:
         if self.cache is not None:
             # try to load cached result
-            if task.task_id in self.cache:
-                self.cache_hit += 1
-                self.logger.info(f"hit cache for task: {task.task_id}")
-                return self.cache[task.task_id]
+            if task._task_id in self.cache:
+                task.from_cache = True
+                task.finished = True
+                self.logger.info(f"hit cache for task: {task._task_id}")
+                return self.cache[task._task_id]
         start = perf_counter()
         async with sem:
             response = await self._client.chat.completions.create(
@@ -51,9 +52,11 @@ class GPTClient:
             )
 
         # try to update cache
+        task.finished = True
         if self.cache is not None:
-            self.cache[task.task_id] = response
-        self.logger.debug(f"{task.task_id} finished in {perf_counter()-start:.3f}s.")
+            self.cache[task._task_id] = response
+        task.run_time = perf_counter()-start
+        self.logger.debug(f"{task._task_id} finished in {task.run_time:.3f}s.")
         return response
 
     async def __run_with_semaphore(
@@ -62,22 +65,28 @@ class GPTClient:
         a_tasks = []
         sem = asyncio.Semaphore(concurrent_num)
         for t in tasks:
-            a_tasks.append(asyncio.create_task(self.__run_single_task(task=t, sem=sem)))
+            a_tasks.append(asyncio.create_task(self.__run_single_chat_completion_task(task=t, sem=sem)))
 
         results = await asyncio.gather(*a_tasks, return_exceptions=True)
         return results
+    
+    def __get_run_status(self, tasks):
+        error_count = sum([1 for task in tasks if not task.finished])
+        cache_hit = sum([1 for task in tasks if task.from_cache])
+        run_times = [task.run_time for task in tasks if task.run_time is not None]
+        mean_run_time = get_mean(run_times)
+        self.logger.info(
+            f"{len(tasks)-error_count} succeed, {error_count} fail, {cache_hit} hit cache | mean run time {mean_run_time:.3f}s."
+        )
 
-    def run_tasks(
+    def run_chat_completion_tasks(
         self, tasks: List[Task], concurrent_num: int = 5
     ) -> List[ChatCompletion]:
         start = perf_counter()
-        self.cache_hit = 0
         self.logger.info(f"Processing starts. Total tasks: {len(tasks)}")
         results = asyncio.run(
             self.__run_with_semaphore(tasks, concurrent_num=concurrent_num)
         )
-        error_count = sum([1 for r in results if not isinstance(r, ChatCompletion)])
-        self.logger.info(
-            f"all tasks finished in {perf_counter()-start:.3f}s. {len(tasks)-error_count} succeed, {error_count} fail, {self.cache_hit} hit cache."
-        )
+        self.logger.info(f"all tasks finished in {perf_counter()-start:.3f}s")
+        self.__get_run_status(tasks)
         return results

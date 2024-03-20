@@ -2,3 +2,4 @@ platformdirs
 openai
 pydantic
 diskcache
+coloredlogs

@@ -1,7 +1,7 @@
-from typing import List
+from typing import List, Union
 from hashlib import md5
 from pydantic import BaseModel, PrivateAttr
-
+from openai.types.chat import ChatCompletion
 
 class Task(BaseModel):
 
@@ -12,7 +12,11 @@ class Task(BaseModel):
     model: str = "gpt-4-turbo-preview"
     # frequency_penalty: float = 0
     # response_format
-    task_id: str = PrivateAttr()
+    _task_id: str = PrivateAttr()
+
+    finished: bool = False
+    from_cache: bool = False
+    run_time: float = None
 
     def get_unique_id(self):
         md5_id = md5(
@@ -21,9 +25,9 @@ class Task(BaseModel):
         return md5_id
 
     def model_post_init(self, __context) -> None:
-        self.task_id = self.get_unique_id()
+        self._task_id = self.get_unique_id()
 
 
 if __name__ == "__main__":
     task = Task(messages=[{"hello": "world"}])
-    print(task.task_id)
+    print(task._task_id)

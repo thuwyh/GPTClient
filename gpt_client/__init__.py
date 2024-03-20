@@ -1,2 +1,2 @@
 from .client import GPTClient
-from .task import Task
+from .types import Task

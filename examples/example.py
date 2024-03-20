@@ -8,7 +8,7 @@ load_dotenv()
 client = GPTClient(
     api_key=os.environ['OPENAI_KEY'],
     base_url=os.environ['OPENAI_BASE_URL'],
-    cache_name='example'
+    cache_name='example1'
 )
 
 tasks: List[Task] = []
@@ -17,7 +17,7 @@ for i in range(30):
         messages=[{'role':'user', 'content':f'{i}+{i+1}='}]
     ))
 
-results = client.run_tasks(tasks)
+results = client.run_chat_completion_tasks(tasks)
 for t, r in zip(tasks, results):
     try:
         print(t.messages[0]['content'], r.choices[0].message.content)

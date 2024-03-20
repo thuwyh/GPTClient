@@ -11,6 +11,8 @@ setup(
     install_requires=[
         "openai",
         "pydantic",
-        "diskcache"
+        "diskcache",
+        "coloredlogs",
+        "platformdirs"
     ],
 )
