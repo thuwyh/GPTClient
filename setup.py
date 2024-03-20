@@ -13,6 +13,7 @@ setup(
         "pydantic",
         "diskcache",
         "coloredlogs",
-        "platformdirs"
+        "platformdirs",
+        "tqdm"
     ],
 )
