@@ -7,6 +7,7 @@ GPTClient is designed to enhance your experience with GPT API by providing an ef
 1. ✨ **Simple**: The main class is within 100 LOC.
 2. 🚀 **High Efficiency:** GPTClient is optimized for batch calling, allowing for quick and efficient operations.
 3. 💰 **Built-in Cache Support:** With our easy-to-use cache support, you can optimize your usage and significantly reduce costs.
+4. ℹ️ **Rich Information:** Detailed info of run time, token usage etc.
 
 ## Getting Started
 
