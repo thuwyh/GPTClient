@@ -1,6 +1,7 @@
 from typing import List
 import os
 from gpt_client import GPTClient, Task
+from gpt_client.result_parser import parse_results_as_strings
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -21,6 +22,13 @@ results = client.run_chat_completion_tasks(tasks)
 for t, r in zip(tasks, results):
     try:
         print(t.messages[0]['content'], r.choices[0].message.content)
+    except:
+        pass
+
+parsed_results = parse_results_as_strings(results)
+for t, r in zip(tasks, parsed_results):
+    try:
+        print(t.messages[0]['content'], r)
     except:
         pass
 
