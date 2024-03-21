@@ -52,7 +52,7 @@ class GPTClient:
         start = perf_counter()
         async with sem:
             response = await self._client.chat.completions.create(
-                messages=task.messages, model=task.model, temperature=task.temperature
+                **task.dump_for_openai_client()
             )
 
         # try to update cache
