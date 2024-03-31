@@ -43,6 +43,46 @@ class Task(BaseModel):
         return self.model_dump(
             include=include
         )
+    
+class TGITask(BaseModel):
+
+    stream: bool = False
+    prompt: str
+    temperature: float = 0.7
+    top_k: int = 10
+    top_p: float = 0.95
+    do_sample: bool = True
+    # frequency_penalty: float = 0
+    max_new_tokens: int = 300
+
+    _task_id: str = PrivateAttr()
+
+    finished: bool = False
+    from_cache: bool = False
+    run_time: float = None
+
+    def get_unique_id(self):
+        md5_id = md5(
+            f"{str(self.prompt)}_{self.temperature}".encode()
+        ).hexdigest()
+        return md5_id
+
+    def model_post_init(self, __context) -> None:
+        self._task_id = self.get_unique_id()
+
+    def dump_for_tgi_client(self):
+        include=[
+                "prompt",
+                "top_k",
+                "top_p",
+                "temperature",
+                "max_new_tokens",
+                # "frequency_penalty"
+            ]
+        return self.model_dump(
+            include=include
+        )
+
 
 
 if __name__ == "__main__":
