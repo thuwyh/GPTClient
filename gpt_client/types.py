@@ -11,7 +11,7 @@ class Task(BaseModel):
     # top_k: int = 40
     # top_p: float = 1
     model: str = "gpt-4-turbo-preview"
-    frequency_penalty: float = 0
+    frequency_penalty: float = 1.0
     response_format: dict = None
     max_tokens: int = None
 
