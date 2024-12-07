@@ -112,7 +112,10 @@ class GPTClient:
                     )
                 )
             return await asyncio.gather(*a_tasks, return_exceptions=True)
-        loop = asyncio.get_event_loop()
+        try:
+            loop = asyncio.get_event_loop()
+        except:
+            loop = asyncio.new_event_loop()
         results = loop.run_until_complete(run_with_semaphore())
 
         self.logger.info(f"all tasks finished in {perf_counter()-start:.3f}s")
