@@ -1,4 +1,4 @@
-from typing import List, Union
+from typing import List, Union, Any
 from hashlib import md5
 from pydantic import BaseModel, PrivateAttr
 from openai.types.chat import ChatCompletion
@@ -12,7 +12,7 @@ class Task(BaseModel):
     # top_p: float = 1
     model: str = "gpt-4-turbo-preview"
     frequency_penalty: float = 1.0
-    response_format: dict = None
+    response_format: Any = None
     max_tokens: int = None
 
     _task_id: str = PrivateAttr()

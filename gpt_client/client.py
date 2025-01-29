@@ -12,7 +12,7 @@ from tqdm.auto import tqdm
 from gpt_client.types import Task, TGITask
 from gpt_client.utils import get_mean
 from huggingface_hub import AsyncInferenceClient
-
+from pydantic import BaseModel
 class GPTClient:
 
     def __init__(
@@ -44,32 +44,58 @@ class GPTClient:
         coloredlogs.install(level=log_level, logger=self.logger)
 
     async def __run_single_chat_completion_task(
-        self, task: Union[Task, TGITask], sem: asyncio.Semaphore, p_bar: tqdm = None
+        self, task: Union[Task, TGITask], sem: asyncio.Semaphore, p_bar: tqdm = None, check_fn: Union[callable,None]=None
     ) -> Union[ChatCompletion, str]:
         if self.cache is not None:
             # try to load cached result
             if task._task_id in self.cache:
-                task.from_cache = True
-                task.finished = True
-                self.logger.info(f"hit cache for task: {task._task_id}")
-                if p_bar is not None:
-                    p_bar.update(1)
-                return self.cache[task._task_id]
+                if check_fn is not None:
+                    valid_cache = check_fn(self.cache[task._task_id])
+                else:
+                    valid_cache = True
+                if valid_cache:
+                    task.from_cache = True
+                    task.finished = True
+                    self.logger.info(f"hit cache for task: {task._task_id}")
+                    if p_bar is not None:
+                        p_bar.update(1)
+                    return self.cache[task._task_id]
+                else:
+                    self.logger.info(f"cache result is not valid: {task._task_id}")
         start = perf_counter()
+        
         async with sem:
-            if isinstance(task, Task):
-                response = await self._client.chat.completions.create(
-                    **task.dump_for_openai_client()
+            for _ in range(3):
+                if isinstance(task, Task):
+                    
+                    if task.response_format is not None and not isinstance(task.response_format, dict):
+                        response = await self._client.beta.chat.completions.parse(
+                            messages=task.messages,
+                            model=task.model,
+                            temperature=task.temperature,
+                            response_format=task.response_format,
+                        )
+                    else:
+                        response = await self._client.chat.completions.create(
+                            **task.dump_for_openai_client()
+                        )
+                else:
+                    response = await self._client.text_generation(
+                    **task.dump_for_tgi_client()
                 )
-            else:
-                response = await self._client.text_generation(
-                **task.dump_for_tgi_client()
-            )
+                if check_fn is not None:
+                    if check_fn(response):
+                        break
+                    self.logger.warning("check fail!")
+                    print(task.messages)
+                else:
+                    print(response.choices[0].message.content)
+                    break
 
         # try to update cache
         task.finished = True
         if self.cache is not None:
-            self.cache[task._task_id] = response
+            self.cache[task._task_id] = response.model_dump()
         task.run_time = perf_counter() - start
         self.logger.debug(f"{task._task_id} finished in {task.run_time:.3f}s.")
         if p_bar is not None:
@@ -96,7 +122,7 @@ class GPTClient:
             )
 
     def run_chat_completion_tasks(
-        self, tasks: List[Union[Task, TGITask]], concurrent_num: int = 5, show_progress_bar: bool = True
+        self, tasks: List[Union[Task, TGITask]], concurrent_num: int = 5, show_progress_bar: bool = True, check_fn: Union[callable,None]=None
     ) -> List[ChatCompletion]:
         start = perf_counter()
         self.logger.info(f"Processing starts. Total tasks: {len(tasks)}")
@@ -108,7 +134,7 @@ class GPTClient:
             for t in tasks:
                 a_tasks.append(
                     asyncio.create_task(
-                        self.__run_single_chat_completion_task(task=t, sem=sem, p_bar=p_bar)
+                        self.__run_single_chat_completion_task(task=t, sem=sem, p_bar=p_bar, check_fn=check_fn)
                     )
                 )
             return await asyncio.gather(*a_tasks, return_exceptions=True)
